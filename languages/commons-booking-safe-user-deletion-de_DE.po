@@ -1,0 +1,95 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: cb-admin-booking\n"
+"POT-Creation-Date: 2019-02-07 16:51+0100\n"
+"PO-Revision-Date: 2019-02-07 16:53+0100\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.0.6\n"
+"X-Poedit-KeywordsList: __;gettext;gettext_noop;___\n"
+"X-Poedit-Basepath: .\n"
+"X-Poedit-SearchPath-0: ..\n"
+
+#: ../classes/class-cb-safe-user-deletion-settings.php:11
+msgid "SETTINGS_TITLE"
+msgstr "Einstellungen für sichere Konten-Löschung"
+
+#: ../classes/class-cb-safe-user-deletion-settings.php:11
+msgid "SETTINGS_MENU"
+msgstr "Sichere Konten-Löschung"
+
+#: ../classes/class-cb-safe-user-deletion-settings.php:44
+msgid "Settings"
+msgstr ""
+
+#: ../classes/class-cb-safe-user-deletion.php:67
+msgid "USER_DELETE_ERROR_1"
+msgstr ""
+"Der Account kann nicht gelöscht werden, da dies aus organisatorischen "
+"Gründen erst %d Tage nach der letzten Buchung möglich ist."
+
+#: ../classes/class-cb-safe-user-deletion.php:72
+msgid "USER_DELETE_ERROR_2"
+msgstr ""
+"Der Account %s kann nicht gelöscht/anonymisiert werden, da dies aus "
+"organisatorischen Gründen erst %d Tage nach der letzten Buchung möglich ist."
+
+#: ../classes/class-cb-safe-user-deletion.php:161
+msgid "USER_DELETE_ERROR_3"
+msgstr ""
+"Beim Löschen des Accounts ist ein Fehler aufgetreten. Bitte nehme Kontakt "
+"mit einem Administrator auf."
+
+#: ../classes/class-cb-safe-user-deletion.php:165
+msgid "USER_DELETE_ERROR_4"
+msgstr ""
+"Beim Anonymisieren des Accounts ist ein Fehler aufgetreten. Die Daten "
+"konnten nicht aktualisiert werden."
+
+#: ../templates/settings-page-template.php:3
+msgid "SETTINGS_PAGE_HEADER"
+msgstr "Einstellungen für sichere Konten-Löschung"
+
+#: ../templates/settings-page-template.php:5
+msgid "SETTINGS_DESCRIPTION"
+msgstr ""
+"Die Einstellungen konfigurieren die sichere Löschung von NutzerInnen-Konten."
+"<br> Wenn das Konto vergangene Buchungen beinhaltet, wird es anonymisiert. "
+"Dies verhindert, dass Buchungen mit nicht existenten Konten verbunden sind "
+"und behält die Buchungen, z.B. für statistische Zwecke.<br>Alle zukünftigen "
+"Buchungen des Nutzers / der Nutzerin zum Zeitpunkt der Kontolöschung werden "
+"gelöscht."
+
+#: ../templates/settings-page-template.php:13
+msgid "PREVENT_DELETION_HEADER"
+msgstr "Buchungsbedingung"
+
+#: ../templates/settings-page-template.php:16
+msgid "PREVENT_DELETION_DESCRIPTION_1"
+msgstr ""
+"Der Wert sollte mindestens der Anzahl der Tage entsprechen, denen es "
+"NutzerInnen erlaubt ist, einen Artikel zu buchen."
+
+#: ../templates/settings-page-template.php:18
+msgid "PREVENT_DELETION_DESCRIPTION_2"
+msgstr "Der Buchungsbeginn wird bei der Berechnung als Grundlage genutzt."
+
+#: ../templates/settings-page-template.php:22
+msgid "PREVENT_DELETION_LABEL"
+msgstr "NutzerInnen können ihr Konto nur löschen, wenn"
+
+#: ../templates/settings-page-template.php:25
+msgid "PREVENT_FOR"
+msgstr "keine Buchung in den letzten"
+
+#: ../templates/settings-page-template.php:27
+msgid "DAYS"
+msgstr "Tagen"
+
+#: ../templates/settings-page-template.php:27
+msgid "VALID_VALUES"
+msgstr "gültige Werte"
