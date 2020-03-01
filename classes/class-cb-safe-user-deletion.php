@@ -184,7 +184,7 @@ class CB_Safe_User_Deletion {
   }
 
   /**
-  * checks if the user with given id is ready for deletion - last booking is longer than 2 weeks ago
+  * checks if the user with given id is ready for deletion - last booking is longer than x days ago
   **/
   function check_user_deletion_readiness($user_id) {
     $days = $this->get_option('check_booking_days_in_past', self::CHECK_BOOKING_DAYS_DEFAULT);
@@ -221,12 +221,32 @@ class CB_Safe_User_Deletion {
     "AND user_id = $user_id";
 
     if($strict) {
-      $select_statement .= " AND status != 'canceled'";
+
+      if($this->table_column_exists($bookings_table_name, 'cancellation_time')) {
+        //if there are bookings canceled after booking started, we have to consider these bookings as important
+        $select_statement .= " AND (status != 'canceled' OR (status = 'canceled' AND cancellation_time IS NOT NULL AND date_start <= cancellation_time))";
+      }
+      else {
+        $select_statement .= " AND status != 'canceled'";
+      }
+
     }
 
     $sqlresult = $wpdb->get_results($wpdb->prepare($select_statement, $reference_date), OBJECT);
 
     return $sqlresult;
+  }
+
+  function table_column_exists( $table_name, $column_name ) {
+    global $wpdb;
+    $column = $wpdb->get_results( $wpdb->prepare(
+      "SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s ",
+      DB_NAME, $table_name, $column_name
+    ) );
+    if ( ! empty( $column ) ) {
+      return true;
+    }
+    return false;
   }
 }
 
