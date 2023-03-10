@@ -19,15 +19,16 @@ class CB_Safe_User_Deletion {
     return isset($this->options[$key]) ? $this->options[$key] : $default;
   }
 
+  function start_session() {
+    if ( !session_id() ) {
+      session_start();
+    }
+  }
+
   /**
   * show error message related to handling of user deletion
   */
   function show_user_delete_error_message() {
-
-    if ( !session_id() ) {
-      session_start();
-    }
-
     if(array_key_exists( 'user_delete_error', $_SESSION )) {
       $class = 'notice notice-error';
       $message = $_SESSION['user_delete_error'];
@@ -84,9 +85,7 @@ class CB_Safe_User_Deletion {
 
     }
     else {
-
-      //delete future bookings
-      $this->delete_future_bookings($user_id);
+      //future bookings are automatically deleted as there are Worpdress posts
     }
 
   }
@@ -95,14 +94,24 @@ class CB_Safe_User_Deletion {
   * delete bookings in the future
   */
   function delete_future_bookings($user_id) {
-    $today = date('Y-m-d', strtotime('now'));
+    $date_from = strtotime('now');
+    //$date_until = strtotime('2099-12-31');
 
-    global $wpdb;
-    $bookings_table_name = $wpdb->prefix . 'cb_bookings';
+    $bookings = \CommonsBooking\Repository\Timeframe::getInRange(
+      $date_from, //date_from
+      null, //date_until
+      [], //locations
+      [], //items
+      [ \CommonsBooking\Wordpress\CustomPostType\Timeframe::BOOKING_ID ], //types
+      true, //returnAsModel
+      ['confirmed', 'canceled', 'canceled', 'unconfirmed', 'publish', 'inherit'] //postStatus
+    );
 
-    $query = "DELETE FROM $bookings_table_name WHERE date_start > '$today' AND user_id=$user_id" ;
-
-    $wpdb->query($query);
+    foreach($bookings as $booking) {
+      if($booking->post_author == $user_id) {
+        wp_delete_post( $id, true );
+      }
+    }
   }
 
   /**
@@ -188,7 +197,7 @@ class CB_Safe_User_Deletion {
   **/
   function check_user_deletion_readiness($user_id) {
     $days = $this->get_option('check_booking_days_in_past', self::CHECK_BOOKING_DAYS_DEFAULT);
-    $reference_date = date('Y-m-d', strtotime("-" . $days . " days"));
+    $reference_date = strtotime("-" . $days . " days");
 
     $bookings = $this->find_recent_user_bookings($user_id, $reference_date, true);
 
@@ -196,7 +205,7 @@ class CB_Safe_User_Deletion {
   }
 
   function is_user_anonymization_needed($user_id, $user_registered) {
-    $reference_date = date('Y-m-d', strtotime($user_registered));
+    $reference_date = strtotime($user_registered);
 
     $bookings = $this->find_recent_user_bookings($user_id, $reference_date, false);
 
@@ -204,49 +213,41 @@ class CB_Safe_User_Deletion {
   }
 
   /**
-  * returns all bookings from db for user with given id that have start date
+  * returns all bookings for user with given id that have start date
   * within the time beetween $reference_date and today
   */
   function find_recent_user_bookings($user_id, $reference_date, $strict = false) {
-    $current_day = date('Y-m-d', strtotime("now"));
+    $date_from = $reference_date;
+    $now = new DateTime();
+    $now->setTime(23, 59, 59);
+    $date_until = $now->getTimestamp();
 
-    global $wpdb;
-
-    $bookings_table_name = $wpdb->prefix . 'cb_bookings';
-
-    $select_statement = "SELECT * " .
-    "FROM " . $bookings_table_name . " ".
-    "WHERE date_start >= '%s' " .
-    "AND date_start <= '" . $current_day . "' " .
-    "AND user_id = $user_id";
+    $status = ['confirmed'];
 
     if($strict) {
-
-      if($this->table_column_exists($bookings_table_name, 'cancellation_time')) {
-        //if there are bookings canceled after booking started, we have to consider these bookings as important
-        $select_statement .= " AND (status != 'canceled' OR (status = 'canceled' AND cancellation_time IS NOT NULL AND date_start <= cancellation_time))";
-      }
-      else {
-        $select_statement .= " AND status != 'canceled'";
-      }
-
+      $status[] = 'canceled';
     }
 
-    $sqlresult = $wpdb->get_results($wpdb->prepare($select_statement, $reference_date), OBJECT);
+    $bookings = \CommonsBooking\Repository\Timeframe::getInRange(
+      $date_from, //date_from
+      $date_until, //date_until
+      [], //locations
+      [], //items
+      [ \CommonsBooking\Wordpress\CustomPostType\Timeframe::BOOKING_ID ], //types
+      true, //returnAsModel
+      $status //postStatus: 'confirmed', 'canceled', 'unconfirmed', 'publish', 'inherit'
+    );
+    //var_dump($bookings);
 
-    return $sqlresult;
-  }
-
-  function table_column_exists( $table_name, $column_name ) {
-    global $wpdb;
-    $column = $wpdb->get_results( $wpdb->prepare(
-      "SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s ",
-      DB_NAME, $table_name, $column_name
-    ) );
-    if ( ! empty( $column ) ) {
-      return true;
+    //filter by user id
+    $filtered_bookings = [];
+    foreach($bookings as $booking) {
+      if($booking->post_author == $user_id) {
+        $filtered_bookings[] = $booking;
+      }
     }
-    return false;
+
+    return $filtered_bookings;
   }
 }
 

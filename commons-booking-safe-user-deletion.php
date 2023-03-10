@@ -26,6 +26,7 @@ $cb_safe_user_deletion_settings = new CB_Safe_User_Deletion_Settings();
 $cb_safe_user_deletion_settings->prepare_settings($cb_safe_user_deletion);
 add_filter( "plugin_action_links_" . plugin_basename( __FILE__ ), array($cb_safe_user_deletion_settings, 'add_settings_link') );
 
+add_action( 'plugins_loaded', array($cb_safe_user_deletion, 'start_session') );
 add_action( 'admin_notices', array($cb_safe_user_deletion, 'show_user_delete_error_message') );
 
 add_action( 'delete_user', array($cb_safe_user_deletion, 'handle_delete_user'));
