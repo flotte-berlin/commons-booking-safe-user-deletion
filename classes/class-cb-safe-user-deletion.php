@@ -19,24 +19,26 @@ class CB_Safe_User_Deletion {
     return isset($this->options[$key]) ? $this->options[$key] : $default;
   }
 
-  function start_session() {
-    if ( !session_id() ) {
-      session_start();
-    }
-  }
-
   /**
   * show error message related to handling of user deletion
   */
   function show_user_delete_error_message() {
-    if(array_key_exists( 'user_delete_error', $_SESSION )) {
+
+    if ( !session_id() ) {
+      @ob_start();
+      session_start();
+    }
+
+    if(isset($_SESSION) && array_key_exists( 'user_delete_error', $_SESSION )) {
       $class = 'notice notice-error';
       $message = $_SESSION['user_delete_error'];
 
       printf( '<div class="%1$s"><p>%2$s</p></div>', esc_attr( $class ), esc_html( $message ) );
     }
 
-    unset( $_SESSION['user_delete_error'] );
+    if(isset($_SESSION)) {
+      unset( $_SESSION['user_delete_error'] );
+    }
   }
 
   /**
