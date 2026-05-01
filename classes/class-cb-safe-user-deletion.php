@@ -53,10 +53,10 @@ class CB_Safe_User_Deletion {
     if($anonymization_needed) {
 
       //check if user can be deleted (no recent bookings)
-      $user_ready_for_deletion = $this->check_user_deletion_readiness($user_id);
+      $user_ready_for_anonymization = $this->check_user_anonymization_readiness($user_id);
 
       //handle error - no user to reassign
-      if(!$user_ready_for_deletion) {
+      if(!$user_ready_for_anonymization) {
         if ( !session_id() ) {
           session_start();
         }
@@ -197,7 +197,7 @@ class CB_Safe_User_Deletion {
   /**
   * checks if the user with given id is ready for deletion - last booking is longer than x days ago
   **/
-  function check_user_deletion_readiness($user_id) {
+  function check_user_anonymization_readiness($user_id) {
     $days = $this->get_option('check_booking_days_in_past', self::CHECK_BOOKING_DAYS_DEFAULT);
     $reference_date = strtotime("-" . $days . " days");
 
