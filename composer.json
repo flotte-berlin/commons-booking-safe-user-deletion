@@ -1,0 +1,12 @@
+{
+  "name": "flotte-berlin/commons-booking-safe-user-deletion",
+  "description": "Test setup for the Commons Booking Safe User Deletion plugin.",
+  "license": "GPL-2.0-or-later",
+  "type": "wordpress-plugin",
+  "require-dev": {
+    "phpunit/phpunit": "^9.6"
+  },
+  "scripts": {
+    "test": "phpunit"
+  }
+}

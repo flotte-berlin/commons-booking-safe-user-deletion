@@ -18,6 +18,10 @@ In the settings one can determine when it is allowed to delete an account under 
 
  * Wordpress-Plugin [Delete me](https://de.wordpress.org/plugins/delete-me/)
 
+## Testing
+
+Install the development dependency with `composer install` and run the test suite with `vendor/bin/phpunit`.
+
 ## Beschreibung
 
 **Commons Booking Safe User Deletion** ist ein Wordpress Plugin, welches das [Commons Booking](https://github.com/wielebenwir/commons-booking) Plugin erweitert und das sichere Löschen/Anonymisieren von NutzerInnen-Konten unterstützt.  

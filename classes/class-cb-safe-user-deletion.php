@@ -134,38 +134,48 @@ class CB_Safe_User_Deletion {
   /**
   * anonymize the account with given user_id
   */
-  function anonymize_user_account($user_id) {
+  function anonymize_user_data($user_id, $date = null) {
+    if(!$date) {
+      $date = new DateTime();
+    }
 
-    $date = new DateTime();
     $current_timestamp =  $date->getTimestamp();
 
     global $wpdb;
     $table_users = $wpdb->prefix . 'users';
 
+    $new_user_login = 'deleted-user-' . $user_id . '-' . $current_timestamp;
+    $hashed_password = wp_hash_password($this->generate_random_string());
+
+    $wpdb->query(
+        "
+        UPDATE $table_users
+        SET user_login = '" . $new_user_login . "',
+        user_email = '',
+        user_nicename = 'Deleted User',
+        display_name = 'Deleted User',
+        user_pass = '" . $hashed_password . "'
+        WHERE ID = $user_id
+        "
+    );
+
+    update_user_meta( $user_id, 'phone', '0000' );
+    update_user_meta( $user_id, 'address', 'unknown' );
+    update_user_meta( $user_id, 'nickname', $new_user_login );
+    update_user_meta( $user_id, 'first_name', 'gelöscht/anonymisiert am:' );
+    update_user_meta( $user_id, 'last_name', date_format($date, "Y-m-d H:i:s") );
+
+    return $new_user_login;
+  }
+
+  function anonymize_user_account($user_id) {
+
+    $date = new DateTime();
+
     $current_user = wp_get_current_user();
 
     try {
-      $new_user_login = 'deleted-user-' . $user_id . '-' . $current_timestamp;
-      $hashed_password = wp_hash_password($this->generate_random_string());
-
-      $wpdb->query(
-          "
-          UPDATE $table_users
-          SET user_login = '" . $new_user_login . "',
-          user_email = '',
-          user_nicename = 'Deleted User',
-          display_name = 'Deleted User',
-          user_pass = '" . $hashed_password . "'
-          WHERE ID = $user_id
-          "
-      );
-
-      //update user meta data
-      update_user_meta( $user_id, 'phone', '0000' );
-      update_user_meta( $user_id, 'address', 'unknown' );
-      update_user_meta( $user_id, 'nickname', $new_user_login );
-      update_user_meta( $user_id, 'first_name', 'gelöscht/anonymisiert am:' );
-      update_user_meta( $user_id, 'last_name', date_format($date, "Y-m-d H:i:s") );
+      $this->anonymize_user_data($user_id, $date);
     }
     catch(Exception $e) {
       if($current_user->ID == $user_id) { //user self-deletion
