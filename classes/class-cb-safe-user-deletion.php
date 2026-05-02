@@ -111,7 +111,7 @@ class CB_Safe_User_Deletion {
 
     foreach($bookings as $booking) {
       if($booking->post_author == $user_id) {
-        wp_delete_post( $id, true );
+        wp_delete_post( $booking->ID, true );
       }
     }
   }
@@ -214,9 +214,64 @@ class CB_Safe_User_Deletion {
     return count($bookings) > 0;
   }
 
+  function get_booking_status($booking) {
+    if(isset($booking->post_status) && $booking->post_status) {
+      return $booking->post_status;
+    }
+
+    return get_post_status($booking->ID);
+  }
+
+  function get_booking_start_timestamp($booking) {
+    if(method_exists($booking, 'getStartDate')) {
+      return $booking->getStartDate();
+    }
+
+    return strtotime(get_post_meta($booking->ID, 'repetition-start', true));
+  }
+
+  function get_booking_end_timestamp($booking) {
+    if(method_exists($booking, 'getTimeframeEndDate')) {
+      return $booking->getTimeframeEndDate();
+    }
+
+    return strtotime(get_post_meta($booking->ID, 'repetition-end', true));
+  }
+
+  function get_booking_cancellation_timestamp($booking) {
+    $cancellation_time = get_post_meta($booking->ID, 'cancellation_time', true);
+
+    if(!$cancellation_time) {
+      return false;
+    }
+
+    if(is_numeric($cancellation_time)) {
+      return (int) $cancellation_time;
+    }
+
+    return strtotime($cancellation_time);
+  }
+
+  function is_recent_booking($booking, $date_from, $date_until) {
+    $booking_status = $this->get_booking_status($booking);
+
+    if($booking_status === 'canceled') {
+      $cancellation_timestamp = $this->get_booking_cancellation_timestamp($booking);
+
+      if($cancellation_timestamp) {
+        return $cancellation_timestamp >= $date_from && $cancellation_timestamp <= $date_until;
+      }
+    }
+
+    $booking_start = $this->get_booking_start_timestamp($booking);
+    $booking_end = $this->get_booking_end_timestamp($booking);
+
+    return $booking_start <= $date_until && (!$booking_end || $booking_end >= $date_from);
+  }
+
   /**
-  * returns all bookings for user with given id that have start date
-  * within the time beetween $reference_date and today
+  * returns all bookings for user with given id that overlap with
+  * the time between $reference_date and today
   */
   function find_recent_user_bookings($user_id, $reference_date, $strict = false) {
     $date_from = $reference_date;
@@ -231,7 +286,7 @@ class CB_Safe_User_Deletion {
     }
 
     $bookings = \CommonsBooking\Repository\Timeframe::getInRange(
-      $date_from, //date_from
+      0, //date_from
       $date_until, //date_until
       [], //locations
       [], //items
@@ -244,7 +299,10 @@ class CB_Safe_User_Deletion {
     //filter by user id
     $filtered_bookings = [];
     foreach($bookings as $booking) {
-      if($booking->post_author == $user_id) {
+      if(
+        $booking->post_author == $user_id &&
+        $this->is_recent_booking($booking, $date_from, $date_until)
+      ) {
         $filtered_bookings[] = $booking;
       }
     }
