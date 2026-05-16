@@ -106,7 +106,7 @@ class CB_Safe_User_Deletion {
       [], //items
       [ \CommonsBooking\Wordpress\CustomPostType\Timeframe::BOOKING_ID ], //types
       true, //returnAsModel
-      ['confirmed', 'canceled', 'canceled', 'unconfirmed', 'publish', 'inherit'] //postStatus
+      ['confirmed', 'canceled', 'unconfirmed', 'publish', 'inherit'] //postStatus
     );
 
     foreach($bookings as $booking) {
@@ -205,7 +205,7 @@ class CB_Safe_User_Deletion {
   }
 
   /**
-  * checks if the user with given id is ready for deletion - last booking is longer than x days ago
+  * checks if the user with given id is ready for anonymization - last booking is longer than x days ago
   **/
   function check_user_anonymization_readiness($user_id) {
     $days = $this->get_option('check_booking_days_in_past', self::CHECK_BOOKING_DAYS_DEFAULT);
@@ -213,7 +213,10 @@ class CB_Safe_User_Deletion {
 
     $bookings = $this->find_recent_user_bookings($user_id, $reference_date, true);
 
-    return count($bookings) == 0;
+    //find archived cb1 bookings
+    $archived_cb1_bookings = $this->find_archived_cb1_user_bookings($user_id, date('Y-m-d', $reference_date), true);
+
+    return count($bookings) == 0 && count($archived_cb1_bookings) == 0;
   }
 
   function is_user_anonymization_needed($user_id, $user_registered) {
@@ -221,7 +224,10 @@ class CB_Safe_User_Deletion {
 
     $bookings = $this->find_recent_user_bookings($user_id, $reference_date, false);
 
-    return count($bookings) > 0;
+    //find archived cb1 bookings
+    $archived_cb1_bookings = $this->find_archived_cb1_user_bookings($user_id, date('Y-m-d', $reference_date), false);
+
+    return count($bookings) > 0 || count($archived_cb1_bookings) > 0;
   }
 
   function get_booking_status($booking) {
@@ -262,26 +268,26 @@ class CB_Safe_User_Deletion {
     return strtotime($cancellation_time);
   }
 
-  function is_recent_booking($booking, $date_from, $date_until) {
+  function is_recent_booking($booking, $date_from, $date_until, $strict = false) {
     $booking_status = $this->get_booking_status($booking);
+    $booking_start = $this->get_booking_start_timestamp($booking);
 
-    if($booking_status === 'canceled') {
-      $cancellation_timestamp = $this->get_booking_cancellation_timestamp($booking);
-
-      if($cancellation_timestamp) {
-        return $cancellation_timestamp >= $date_from && $cancellation_timestamp <= $date_until;
-      }
+    if($booking_start < $date_from || $booking_start > $date_until) {
+      return false;
     }
 
-    $booking_start = $this->get_booking_start_timestamp($booking);
-    $booking_end = $this->get_booking_end_timestamp($booking);
+    if(!$strict || $booking_status !== 'canceled') {
+      return true;
+    }
 
-    return $booking_start <= $date_until && (!$booking_end || $booking_end >= $date_from);
+    $cancellation_timestamp = $this->get_booking_cancellation_timestamp($booking);
+
+    return $cancellation_timestamp && $booking_start <= $cancellation_timestamp;
   }
 
   /**
-  * returns all bookings for user with given id that overlap with
-  * the time between $reference_date and today
+  * returns all bookings for user with given id that start
+  * between $reference_date and today
   */
   function find_recent_user_bookings($user_id, $reference_date, $strict = false) {
     $date_from = $reference_date;
@@ -289,11 +295,7 @@ class CB_Safe_User_Deletion {
     $now->setTime(23, 59, 59);
     $date_until = $now->getTimestamp();
 
-    $status = ['confirmed'];
-
-    if($strict) {
-      $status[] = 'canceled';
-    }
+    $status = ['confirmed', 'canceled'];
 
     $bookings = \CommonsBooking\Repository\Timeframe::getInRange(
       0, //date_from
@@ -311,13 +313,59 @@ class CB_Safe_User_Deletion {
     foreach($bookings as $booking) {
       if(
         $booking->post_author == $user_id &&
-        $this->is_recent_booking($booking, $date_from, $date_until)
+        $this->is_recent_booking($booking, $date_from, $date_until, $strict)
       ) {
         $filtered_bookings[] = $booking;
       }
     }
 
     return $filtered_bookings;
+  }
+
+  /**
+  * returns all archived bookings from db for user with given id that have start date
+  * within the time beetween $reference_date and today
+  */
+  function find_archived_cb1_user_bookings($user_id, $reference_date, $strict = false) {
+    $current_day = date('Y-m-d', strtotime("now"));
+
+    global $wpdb;
+
+    $bookings_table_name = $wpdb->prefix . 'cb_bookings_archive';
+
+    $select_statement = "SELECT * " .
+    "FROM " . $bookings_table_name . " ".
+    "WHERE date_start >= '%s' " .
+    "AND date_start <= '" . $current_day . "' " .
+    "AND user_id = $user_id";
+
+    if($strict) {
+
+      if($this->table_column_exists($bookings_table_name, 'cancellation_time')) {
+        //if there are bookings canceled after booking started, we have to consider these bookings as important
+        $select_statement .= " AND (status != 'canceled' OR (status = 'canceled' AND cancellation_time IS NOT NULL AND date_start <= cancellation_time))";
+      }
+      else {
+        $select_statement .= " AND status != 'canceled'";
+      }
+
+    }
+
+    $sqlresult = $wpdb->get_results($wpdb->prepare($select_statement, $reference_date), OBJECT);
+
+    return $sqlresult;
+  }
+
+  function table_column_exists( $table_name, $column_name ) {
+    global $wpdb;
+    $column = $wpdb->get_results( $wpdb->prepare(
+      "SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s ",
+      DB_NAME, $table_name, $column_name
+    ) );
+    if ( ! empty( $column ) ) {
+      return true;
+    }
+    return false;
   }
 }
 

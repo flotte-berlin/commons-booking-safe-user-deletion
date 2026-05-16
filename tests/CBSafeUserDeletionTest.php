@@ -68,13 +68,37 @@ final class CBSafeUserDeletionTest extends TestCase {
     $this->assertFalse($this->plugin->check_user_anonymization_readiness($user_id));
   }
 
+  public function test_old_archived_confirmed_booking_requires_anonymization_and_is_ready(): void {
+    $user_id = $this->createUser('-60 days');
+    $this->createArchivedBooking($user_id, '-30 days', 'confirmed');
+
+    $this->assertTrue($this->plugin->is_user_anonymization_needed($user_id, $this->getUserRegisteredAt($user_id)));
+    $this->assertTrue($this->plugin->check_user_anonymization_readiness($user_id));
+  }
+
+  public function test_recent_archived_confirmed_booking_blocks_readiness(): void {
+    $user_id = $this->createUser('-60 days');
+    $this->createArchivedBooking($user_id, '-7 days', 'confirmed');
+
+    $this->assertTrue($this->plugin->is_user_anonymization_needed($user_id, $this->getUserRegisteredAt($user_id)));
+    $this->assertFalse($this->plugin->check_user_anonymization_readiness($user_id));
+  }
+
+  public function test_recent_archived_canceled_booking_after_start_blocks_readiness(): void {
+    $user_id = $this->createUser('-60 days');
+    $this->createArchivedBooking($user_id, '-7 days', 'canceled', '-5 days');
+
+    $this->assertTrue($this->plugin->is_user_anonymization_needed($user_id, $this->getUserRegisteredAt($user_id)));
+    $this->assertFalse($this->plugin->check_user_anonymization_readiness($user_id));
+  }
+
   public function test_recent_canceled_booking_with_recent_cancellation_blocks_readiness(): void {
     $user_id = $this->createUser('-60 days');
     $this->createBooking($user_id, '-7 days', '-6 days', 'canceled', true, [
       'cancellation_time' => strtotime('-5 days'),
     ]);
 
-    $this->assertFalse($this->plugin->is_user_anonymization_needed($user_id, $this->getUserRegisteredAt($user_id)));
+    $this->assertTrue($this->plugin->is_user_anonymization_needed($user_id, $this->getUserRegisteredAt($user_id)));
     $this->assertFalse($this->plugin->check_user_anonymization_readiness($user_id));
   }
 
@@ -84,7 +108,7 @@ final class CBSafeUserDeletionTest extends TestCase {
       'cancellation_time' => strtotime('-45 days'),
     ]);
 
-    $this->assertFalse($this->plugin->is_user_anonymization_needed($user_id, $this->getUserRegisteredAt($user_id)));
+    $this->assertTrue($this->plugin->is_user_anonymization_needed($user_id, $this->getUserRegisteredAt($user_id)));
     $this->assertTrue($this->plugin->check_user_anonymization_readiness($user_id));
   }
 
@@ -94,7 +118,15 @@ final class CBSafeUserDeletionTest extends TestCase {
       'cancellation_time' => strtotime('-30 days'),
     ]);
 
-    $this->assertFalse($this->plugin->is_user_anonymization_needed($user_id, $this->getUserRegisteredAt($user_id)));
+    $this->assertTrue($this->plugin->is_user_anonymization_needed($user_id, $this->getUserRegisteredAt($user_id)));
+    $this->assertTrue($this->plugin->check_user_anonymization_readiness($user_id));
+  }
+
+  public function test_recent_canceled_booking_without_cancellation_timestamp_does_not_block_readiness(): void {
+    $user_id = $this->createUser('-60 days');
+    $this->createBooking($user_id, '-7 days', '-6 days', 'canceled');
+
+    $this->assertTrue($this->plugin->is_user_anonymization_needed($user_id, $this->getUserRegisteredAt($user_id)));
     $this->assertTrue($this->plugin->check_user_anonymization_readiness($user_id));
   }
 
@@ -113,18 +145,18 @@ final class CBSafeUserDeletionTest extends TestCase {
     $this->assertArrayHasKey($other_future_booking->ID, $GLOBALS['cb_sud_test_state']['posts']);
   }
 
-  public function test_overlap_with_threshold_counts_as_recent_booking(): void {
+  public function test_booking_start_before_threshold_does_not_count_as_recent_booking(): void {
     $user_id = $this->createUser('-60 days');
     $this->createBooking($user_id, '-20 days', '-10 days', 'confirmed');
 
-    $this->assertFalse($this->plugin->check_user_anonymization_readiness($user_id));
+    $this->assertTrue($this->plugin->check_user_anonymization_readiness($user_id));
   }
 
   public function test_exact_threshold_boundary_is_included(): void {
     $user_id = $this->createUser('-60 days');
     $reference_date = strtotime('-14 days');
 
-    $this->createBooking($user_id, $reference_date - 86400, $reference_date, 'confirmed');
+    $this->createBooking($user_id, $reference_date, $reference_date + 86400, 'confirmed');
 
     $bookings = $this->plugin->find_recent_user_bookings($user_id, $reference_date, true);
 
@@ -225,6 +257,23 @@ final class CBSafeUserDeletionTest extends TestCase {
     foreach($meta as $key => $value) {
       $GLOBALS['cb_sud_test_state']['post_meta'][$booking_id][$key] = $value;
     }
+
+    return $booking;
+  }
+
+  private function createArchivedBooking($user_id, $start_at, $status, $cancellation_time = null): object {
+    $start_timestamp = is_int($start_at) ? $start_at : strtotime($start_at);
+
+    $booking = (object) [
+      'user_id' => $user_id,
+      'date_start' => date('Y-m-d', $start_timestamp),
+      'status' => $status,
+      'cancellation_time' => $cancellation_time === null
+        ? null
+        : (is_int($cancellation_time) ? date('Y-m-d', $cancellation_time) : date('Y-m-d', strtotime($cancellation_time))),
+    ];
+
+    $GLOBALS['cb_sud_test_state']['archived_bookings'][] = $booking;
 
     return $booking;
   }

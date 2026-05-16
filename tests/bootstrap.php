@@ -5,6 +5,93 @@ namespace {
 class CB_SUD_Test_WPDB {
   public $prefix = 'wp_';
 
+  public function prepare($query, ...$args) {
+    foreach($args as $arg) {
+      $replacement = is_numeric($arg) ? (string) $arg : "'" . addslashes((string) $arg) . "'";
+      $query = preg_replace("/'%s'|%s/", $replacement, $query, 1);
+    }
+
+    return $query;
+  }
+
+  public function get_results($sql, $output = OBJECT) {
+    if(strpos($sql, 'INFORMATION_SCHEMA.COLUMNS') !== false) {
+      return $this->get_schema_results($sql);
+    }
+
+    if(strpos($sql, 'cb_bookings_archive') !== false) {
+      return $this->get_archived_booking_results($sql);
+    }
+
+    return [];
+  }
+
+  private function get_schema_results($sql) {
+    if(
+      !preg_match("/TABLE_NAME = '([^']+)'/", $sql, $table_matches) ||
+      !preg_match("/COLUMN_NAME = '([^']+)'/", $sql, $column_matches)
+    ) {
+      return [];
+    }
+
+    $table_name = $table_matches[1];
+    $column_name = $column_matches[1];
+    $columns = $GLOBALS['cb_sud_test_state']['schema_columns'][$table_name] ?? [];
+
+    if(!in_array($column_name, $columns, true)) {
+      return [];
+    }
+
+    return [(object) ['TABLE_NAME' => $table_name, 'COLUMN_NAME' => $column_name]];
+  }
+
+  private function get_archived_booking_results($sql) {
+    if(
+      !preg_match("/date_start >= '([^']+)'/", $sql, $from_matches) ||
+      !preg_match("/date_start <= '([^']+)'/", $sql, $until_matches) ||
+      !preg_match('/user_id = (\d+)/', $sql, $user_matches)
+    ) {
+      return [];
+    }
+
+    $date_from = $from_matches[1];
+    $date_until = $until_matches[1];
+    $user_id = (int) $user_matches[1];
+    $strict_without_canceled = strpos($sql, "AND status != 'canceled'") !== false;
+    $strict_with_cancellation_time = strpos($sql, "status = 'canceled' AND cancellation_time IS NOT NULL AND date_start <= cancellation_time") !== false;
+
+    $results = [];
+
+    foreach($GLOBALS['cb_sud_test_state']['archived_bookings'] as $booking) {
+      if((int) $booking->user_id !== $user_id) {
+        continue;
+      }
+
+      if($booking->date_start < $date_from || $booking->date_start > $date_until) {
+        continue;
+      }
+
+      if($strict_without_canceled && $booking->status === 'canceled') {
+        continue;
+      }
+
+      if(
+        $strict_with_cancellation_time &&
+        $booking->status === 'canceled' &&
+        (
+          empty($booking->cancellation_time) ||
+          $booking->date_start > $booking->cancellation_time
+        )
+      ) {
+        continue;
+      }
+
+      $results[] = $booking;
+    }
+
+    return $results;
+  }
+
   public function query($sql) {
     if(!preg_match('/WHERE ID = (\d+)/', $sql, $id_matches)) {
       return false;
@@ -63,6 +150,10 @@ function cb_sud_reset_test_state() {
     'posts' => [],
     'post_meta' => [],
     'timeframes' => [],
+    'archived_bookings' => [],
+    'schema_columns' => [
+      'wp_cb_bookings_archive' => ['cancellation_time'],
+    ],
     'deleted_posts' => [],
     'redirects' => [],
     'logged_out' => false,
@@ -206,6 +297,14 @@ function wp_redirect($location) {
   $GLOBALS['cb_sud_test_state']['redirects'][] = $location;
 
   return true;
+}
+
+if(!defined('DB_NAME')) {
+  define('DB_NAME', 'test_db');
+}
+
+if(!defined('OBJECT')) {
+  define('OBJECT', 'OBJECT');
 }
 
 cb_sud_reset_test_state();
