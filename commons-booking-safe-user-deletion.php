@@ -3,7 +3,7 @@
 Plugin Name: Commons Booking Safe User Deletion
 Plugin URI:   https://github.com/flotte-berlin/commons-booking-safe-user-deletion
 Description: Ein Plugin zur sicheren Löschung von User Accounts bei Nutzung von Commons Booking - Löschung zukünftiger und Sicherung vergangener Buchungen
-Version: 0.3.0
+Version: 0.3.1
 Author:       poilu
 Author URI:   https://github.com/poilu
 License:      GPLv2 or later
@@ -26,7 +26,6 @@ $cb_safe_user_deletion_settings = new CB_Safe_User_Deletion_Settings();
 $cb_safe_user_deletion_settings->prepare_settings($cb_safe_user_deletion);
 add_filter( "plugin_action_links_" . plugin_basename( __FILE__ ), array($cb_safe_user_deletion_settings, 'add_settings_link') );
 
-add_action( 'plugins_loaded', array($cb_safe_user_deletion, 'start_session') );
 add_action( 'admin_notices', array($cb_safe_user_deletion, 'show_user_delete_error_message') );
 
 add_action( 'delete_user', array($cb_safe_user_deletion, 'handle_delete_user'));
