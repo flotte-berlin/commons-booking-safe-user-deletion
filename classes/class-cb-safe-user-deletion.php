@@ -82,7 +82,8 @@ class CB_Safe_User_Deletion {
 
     }
     else {
-      //future bookings are automatically deleted as there are Worpdress posts
+      //future bookings are not automatically deleted (not part of post_types_to_delete_with_user), so we have to do it here
+      $this->delete_future_bookings($user_id);
     }
 
   }
