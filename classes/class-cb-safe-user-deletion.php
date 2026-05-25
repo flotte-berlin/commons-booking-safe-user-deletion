@@ -24,20 +24,15 @@ class CB_Safe_User_Deletion {
   */
   function show_user_delete_error_message() {
 
-    if ( !session_id() ) {
-      @ob_start();
-      session_start();
-    }
+    $key = 'user_delete_error_' . get_current_user_id();
+    $message = get_transient($key);
 
-    if(isset($_SESSION) && array_key_exists( 'user_delete_error', $_SESSION )) {
+    if($message) {
       $class = 'notice notice-error';
-      $message = $_SESSION['user_delete_error'];
 
       printf( '<div class="%1$s"><p>%2$s</p></div>', esc_attr( $class ), esc_html( $message ) );
-    }
 
-    if(isset($_SESSION)) {
-      unset( $_SESSION['user_delete_error'] );
+      delete_transient($key);
     }
   }
 
@@ -67,12 +62,12 @@ class CB_Safe_User_Deletion {
 
         if($current_user->ID == $user_id) { //user self deletion
 
-          $_SESSION['user_delete_error'] = sprintf( cb_safe_user_deletion\__('USER_DELETE_ERROR_1', 'commons-booking-safe-user-deletion', "The account can't be deleted, because this is only possible %d days after the last booking. "), $check_booking_days_in_past);
+          $this->store_user_delete_error(sprintf( cb_safe_user_deletion\__('USER_DELETE_ERROR_1', 'commons-booking-safe-user-deletion', "The account can't be deleted, because this is only possible %d days after the last booking. "), $check_booking_days_in_past));
           wp_redirect( '/wp-admin/options.php?page=plugin_delete_me_confirmation' );
         }
         else { //user deletion by admin
 
-          $_SESSION['user_delete_error'] = sprintf( cb_safe_user_deletion\__('USER_DELETE_ERROR_2', 'commons-booking-safe-user-deletion', "The account of %s can't be deleted, because this is only possible %d days after the last booking. "), $user_data->user_login, $check_booking_days_in_past);
+          $this->store_user_delete_error(sprintf( cb_safe_user_deletion\__('USER_DELETE_ERROR_2', 'commons-booking-safe-user-deletion', "The account of %s can't be deleted, because this is only possible %d days after the last booking. "), $user_data->user_login, $check_booking_days_in_past));
           wp_redirect( '/wp-admin/users.php' );
         }
 
@@ -90,6 +85,10 @@ class CB_Safe_User_Deletion {
       //future bookings are automatically deleted as there are Worpdress posts
     }
 
+  }
+
+  function store_user_delete_error(string $message): void {
+    set_transient('user_delete_error_' . get_current_user_id(), $message);
   }
 
   /**
@@ -179,11 +178,11 @@ class CB_Safe_User_Deletion {
     }
     catch(Exception $e) {
       if($current_user->ID == $user_id) { //user self-deletion
-        $_SESSION['user_delete_error'] = cb_safe_user_deletion\__('USER_DELETE_ERROR_3', 'commons-booking-safe-user-deletion', "An error occurred while deleting the account. Please contact an administrator.");
+        $this->store_user_delete_error(cb_safe_user_deletion\__('USER_DELETE_ERROR_3', 'commons-booking-safe-user-deletion', "An error occurred while deleting the account. Please contact an administrator."));
         wp_redirect( '/wp-admin/options.php?page=plugin_delete_me_confirmation' );
       }
       else { //user deletion by admin
-        $_SESSION['user_delete_error'] = cb_safe_user_deletion\__('USER_DELETE_ERROR_4', 'commons-booking-safe-user-deletion', "An error occurred while deleting the account. The data wasn't updated.");
+        $this->store_user_delete_error(cb_safe_user_deletion\__('USER_DELETE_ERROR_4', 'commons-booking-safe-user-deletion', "An error occurred while deleting the account. The data wasn't updated."));
         wp_redirect( '/wp-admin/users.php' );
       }
 
